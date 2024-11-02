@@ -21,3 +21,7 @@ set CELERY_BROKER_URL=redis://localhost:6379/0
 set CELERY_RESULT_BACKEND=redis://localhost:6379/0
 
 celery -A app.celery worker --loglevel=info
+
+
+# how to start manually on windows via docker-compose, note that if you do set in the terminal, the values won't override the docker-compose, it only works if you prefix like below.
+set CELERY_BROKER_URL=redis://localhost:6379/0 && set CELERY_RESULT_BACKEND=redis://localhost:6379/0 && docker-compose up
