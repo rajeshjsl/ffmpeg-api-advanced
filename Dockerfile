@@ -24,7 +24,7 @@ RUN mkdir -p /tmp/ffmpeg_api && \
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 
-# Create entrypoint script for Gunicorn with explicit Python path
+# Create entrypoint script for Gunicorn
 RUN echo '#!/bin/bash\n\
 export PYTHONPATH=/app\n\
 exec gunicorn \
@@ -39,6 +39,14 @@ exec gunicorn \
     "app:create_app()"' > /app/entrypoint.sh && \
     chmod +x /app/entrypoint.sh
 
+# Create entrypoint script for Celery worker
+RUN echo '#!/bin/bash\n\
+export PYTHONPATH=/app\n\
+exec celery -A app.celery worker \
+    --loglevel=info \
+    --concurrency=${CELERY_CONCURRENCY:-2}' > /app/worker-entrypoint.sh && \
+    chmod +x /app/worker-entrypoint.sh
+
 # Set other environment variables
 ENV GUNICORN_WORKERS=2
 ENV GUNICORN_THREADS=2
@@ -50,6 +58,7 @@ ENV FFMPEG_THREADS=auto
 ENV KEEP_FILES=false
 ENV CLEANUP_INTERVAL=3600
 ENV FILE_RETENTION_PERIOD=86400
+ENV CELERY_CONCURRENCY=2
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
@@ -57,4 +66,5 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 
 EXPOSE 8000
 
+# Default to API entrypoint, but allow override
 ENTRYPOINT ["/app/entrypoint.sh"]

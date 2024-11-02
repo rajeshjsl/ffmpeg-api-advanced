@@ -1,3 +1,7 @@
+docker-compose up --build
+
+# Ignore below since we are not testing the app for windows environment, (has process handling/killing and file handling mechanisms required)
+
 
 # In terminal run below (watch docker desktop, it'll start as background container)
 docker run --name ffmpeg-api-redis-dev -d -p 6379:6379 redis:alpine

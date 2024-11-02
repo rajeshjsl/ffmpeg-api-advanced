@@ -6,13 +6,13 @@ import signal
 import logging
 import json
 from typing import List, Dict, Optional, Union
-from celery import Task
+from celery import Task, shared_task
 
+# Import celery app instance from the app package
 from app import celery
 from app.utils.redis_utils import RedisManager
 
 logger = logging.getLogger(__name__)
-
 class FFmpegProcessor:
     def __init__(self):
         self.temp_dir = Path(tempfile.gettempdir()) / "ffmpeg_api"
@@ -122,7 +122,7 @@ class FFmpegTask(Task):
         """Handle task failure"""
         RedisManager().update_task_status(task_id, 'failed', error=str(exc))
 
-@celery.task(base=FFmpegTask, bind=True)
+@celery.task(base=FFmpegTask, bind=True, name='app.core.processor.process_ffmpeg')
 def process_ffmpeg(self, task_type: str, input_files: List[str], 
                   output_file: str, custom_params: Optional[str] = None):
     """Process FFmpeg task"""

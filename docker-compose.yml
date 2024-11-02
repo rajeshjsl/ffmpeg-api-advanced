@@ -6,7 +6,7 @@ services:
         limits:
           cpus: '2'
     ports:
-      - "8000:8000"  # Expose the API port to host
+      - "8000:8000"
     networks:
       - ffmpeg_network
     volumes:
@@ -34,7 +34,7 @@ services:
 
   worker:
     build: .
-    command: celery -A app.celery worker --loglevel=info --concurrency=2
+    entrypoint: ["/app/worker-entrypoint.sh"]  # Override entrypoint for worker
     networks:
       - ffmpeg_network
     volumes:
@@ -47,6 +47,7 @@ services:
       - KEEP_FILES=false
       - CLEANUP_INTERVAL=3600
       - FILE_RETENTION_PERIOD=86400
+      - CELERY_CONCURRENCY=2
     depends_on:
       - redis
 
