@@ -50,17 +50,14 @@ def captionize_video():
     video_path = save_uploaded_file(video_file, 'video')
     subtitle_path = save_uploaded_file(subtitle_file, 'sub')
     output_path = video_path.parent / f"output_{uuid.uuid4()}_{video_path.name}"
-    
-    # Get FFmpeg timeout value
-    # If FFMPEG_TIMEOUT=0 or not set, it means no timeout
-    ffmpeg_timeout = int(os.getenv('FFMPEG_TIMEOUT', '0'))
-    
-    # Start processing task
+
+    # Start processing task with callback URL
     task = process_ffmpeg.delay(
         'captionize',
         [str(video_path), str(subtitle_path)],
         str(output_path),
-        custom_command
+        custom_command,
+        callback_url=callback_url
     )
     
     if callback_url:
@@ -75,6 +72,7 @@ def captionize_video():
         # For synchronous requests:
         # - If FFMPEG_TIMEOUT=0, we wait indefinitely (timeout=None)
         # - If FFMPEG_TIMEOUT>0, we use that value
+        ffmpeg_timeout = int(os.getenv('FFMPEG_TIMEOUT', '0'))
         result = task.get(timeout=None if ffmpeg_timeout == 0 else ffmpeg_timeout)
         
         # Determine mime type
@@ -118,15 +116,13 @@ def normalize_audio():
     input_path = save_uploaded_file(input_file, 'input')
     output_path = input_path.parent / f"normalized_{uuid.uuid4()}_{input_path.name}"
     
-    # Get FFmpeg timeout value
-    ffmpeg_timeout = int(os.getenv('FFMPEG_TIMEOUT', '0'))
-    
-    # Start processing task
+    # Start processing task with callback URL
     task = process_ffmpeg.delay(
         'normalize',
         [str(input_path)],
         str(output_path),
-        custom_command
+        custom_command,
+        callback_url=callback_url
     )
     
     if callback_url:
@@ -136,7 +132,9 @@ def normalize_audio():
             'status_url': f'/queue/task/{task.id}'
         }), 202
         
+    # Wait for result if no callback
     try:
+        ffmpeg_timeout = int(os.getenv('FFMPEG_TIMEOUT', '0'))
         result = task.get(timeout=None if ffmpeg_timeout == 0 else ffmpeg_timeout)
         
         mime_type, _ = mimetypes.guess_type(output_path)
@@ -196,7 +194,6 @@ def custom_ffmpeg():
         else:
             continue
             
-        # Extract index from key (e.g., input_video[0] -> 0)
         try:
             idx = int(key[key.index('[')+1:key.index(']')])
             saved_path = save_uploaded_file(file, f"{prefix}{idx}")
@@ -223,38 +220,17 @@ def custom_ffmpeg():
     callback_url = request.form.get('callback_url')
     ffmpeg_timeout = int(os.getenv('FFMPEG_TIMEOUT', '0'))
 
-    # Start processing task
+    # Start processing task with callback URL
     task = process_ffmpeg.delay(
         'custom',
         list(file_paths.values()),
         str(output_path),
-        custom_command
+        custom_command,
+        callback_url=callback_url  # Pass callback URL to task
     )
     
-    if callback_url:
-        return jsonify({
-            'task_id': task.id,
-            'status': 'processing',
-            'status_url': f'/queue/task/{task.id}'
-        }), 202
-        
-    try:
-        result = task.get(timeout=None if ffmpeg_timeout == 0 else ffmpeg_timeout)
-        
-        mime_type, _ = mimetypes.guess_type(output_path)
-        if not mime_type:
-            mime_type = 'video/mp4'
-            
-        response = send_file(
-            result,
-            mimetype=mime_type,
-            as_attachment=True,
-            download_name=f"output_{first_input.name}"
-        )
-        
-        response.headers['Content-Type'] = mime_type
-        response.headers['X-Filename'] = f"output_{first_input.name}"
-        
-        return response
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    return jsonify({
+        'task_id': task.id,
+        'status': 'processing',
+        'status_url': f'/queue/task/{task.id}'
+    }), 202

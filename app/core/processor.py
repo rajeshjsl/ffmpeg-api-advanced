@@ -5,6 +5,8 @@ import os
 import signal
 import logging
 import json
+import mimetypes
+import requests
 from typing import List, Dict, Optional, Union
 from celery import Task, shared_task
 
@@ -114,17 +116,62 @@ class FFmpegTask(Task):
     """Base class for FFmpeg Celery tasks"""
     abstract = True
 
+    def _send_callback(self, task_id: str, result_path: str, callback_url: str, error: Optional[str] = None):
+        """Send callback with result file or error"""
+        try:
+            if error:
+                response = requests.post(callback_url, json={
+                    'task_id': task_id,
+                    'status': 'failed',
+                    'error': error
+                })
+            else:
+                # Determine mime type
+                mime_type, _ = mimetypes.guess_type(result_path)
+                if not mime_type:
+                    mime_type = 'video/mp4'
+
+                # Send file in callback
+                with open(result_path, 'rb') as f:
+                    files = {'file': (os.path.basename(result_path), f, mime_type)}
+                    response = requests.post(
+                        callback_url,
+                        files=files,
+                        data={
+                            'task_id': task_id,
+                            'status': 'completed'
+                        }
+                    )
+            
+            if not response.ok:
+                logger.error(f"Callback failed: {response.status_code} - {response.text}")
+                
+        except Exception as e:
+            logger.error(f"Error sending callback: {str(e)}")
+
     def on_success(self, retval, task_id, args, kwargs):
         """Handle successful task completion"""
         RedisManager().update_task_status(task_id, 'completed', result=retval)
+        
+        # Get callback URL from task context
+        callback_url = kwargs.get('callback_url')
+        if callback_url and retval:
+            self._send_callback(task_id, retval, callback_url)
 
     def on_failure(self, exc, task_id, args, kwargs, einfo):
         """Handle task failure"""
-        RedisManager().update_task_status(task_id, 'failed', error=str(exc))
+        error = str(exc)
+        RedisManager().update_task_status(task_id, 'failed', error=error)
+        
+        # Send error to callback URL if provided
+        callback_url = kwargs.get('callback_url')
+        if callback_url:
+            self._send_callback(task_id, '', callback_url, error=error)
 
 @celery.task(base=FFmpegTask, bind=True, name='app.core.processor.process_ffmpeg')
 def process_ffmpeg(self, task_type: str, input_files: List[str], 
-                  output_file: str, custom_params: Optional[str] = None):
+                  output_file: str, custom_params: Optional[str] = None,
+                  callback_url: Optional[str] = None):
     """Process FFmpeg task"""
     processor = FFmpegProcessor()
     RedisManager().update_task_status(self.request.id, 'processing')
