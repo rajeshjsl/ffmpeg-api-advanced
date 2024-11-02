@@ -1,15 +1,12 @@
 ffmpeg-api/
 ├── app/
 │   ├── __init__.py
-│   ├── core/
-│   │   ├── __init__.py
+│   ├── core/   
 │   │   └── processor.py
 │   ├── routes/
-│   │   ├── __init__.py
 │   │   ├── api.py
 │   │   └── monitor.py
 │   └── utils/
-│       ├── __init__.py
 │       └── redis_utils.py
 ├── tests/
 │   ├── __init__.py

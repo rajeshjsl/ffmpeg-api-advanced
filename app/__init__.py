@@ -42,3 +42,5 @@ celery.conf.update({
     'task_time_limit': int(os.environ.get('FFMPEG_TIMEOUT', '0') or 0) or None,  # Task timeout
     'worker_max_tasks_per_child': 100  # Restart workers after 100 tasks
 })
+
+app = create_app()
