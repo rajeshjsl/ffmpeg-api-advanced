@@ -31,7 +31,7 @@ exec gunicorn \
     --access-logfile - \
     --error-logfile - \
     --log-level info \
-    app:app' > /app/entrypoint.sh && \
+    "app:create_app()"' > /app/entrypoint.sh && \
     chmod +x /app/entrypoint.sh
 
 # Set environment variables
