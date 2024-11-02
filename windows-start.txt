@@ -1,0 +1,23 @@
+
+# In terminal run below (watch docker desktop, it'll start as background container)
+docker run --name ffmpeg-api-redis-dev -d -p 6379:6379 redis:alpine
+
+
+Set Environment Variables (in CMD)
+set CELERY_BROKER_URL=redis://localhost:6379/0
+set CELERY_RESULT_BACKEND=redis://localhost:6379/0
+set FFMPEG_TIMEOUT=0
+set FFMPEG_THREADS=auto
+set KEEP_FILES=false
+set CLEANUP_INTERVAL=3600
+set FILE_RETENTION_PERIOD=86400
+
+# start flask in this terminal (notice that redis is already detached)
+python -m flask run --host=0.0.0.0 --port=8000
+
+# now, in another new terminal, run
+# Don't forget to set environment variables in this terminal too
+set CELERY_BROKER_URL=redis://localhost:6379/0
+set CELERY_RESULT_BACKEND=redis://localhost:6379/0
+
+celery -A app.celery worker --loglevel=info
