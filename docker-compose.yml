@@ -5,6 +5,10 @@ services:
       resources:
         limits:
           cpus: '2'
+    ports:
+      - "8000:8000"  # Expose the API port to host
+    networks:
+      - ffmpeg_network
     volumes:
       - ffmpeg_api:/tmp/ffmpeg_api
     environment:
@@ -31,6 +35,8 @@ services:
   worker:
     build: .
     command: celery -A app.celery worker --loglevel=info --concurrency=2
+    networks:
+      - ffmpeg_network
     volumes:
       - ffmpeg_api:/tmp/ffmpeg_api
     environment:
@@ -46,8 +52,14 @@ services:
 
   redis:
     image: redis:alpine
+    networks:
+      - ffmpeg_network
     volumes:
       - redis_data:/data
+
+networks:
+  ffmpeg_network:
+    driver: bridge
 
 volumes:
   ffmpeg_api:
