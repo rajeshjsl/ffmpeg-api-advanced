@@ -20,14 +20,15 @@ class FFmpegProcessor:
         self.ffmpeg_threads = os.getenv('FFMPEG_THREADS', 'auto')
         self.cleanup_interval = int(os.getenv('CLEANUP_INTERVAL', '3600'))
         self.retention_period = int(os.getenv('FILE_RETENTION_PERIOD', '86400'))
-        self.ffmpeg_timeout = int(os.getenv('FFMPEG_TIMEOUT', '0')) or None
-        self.redis = RedisManager()
+        # If FFMPEG_TIMEOUT=0 or not set, it means no timeout (None)
+        ffmpeg_timeout = int(os.getenv('FFMPEG_TIMEOUT', '0'))
+        self.ffmpeg_timeout = None if ffmpeg_timeout == 0 else ffmpeg_timeout
 
     def _run_ffmpeg_process(self, command: List[str]) -> subprocess.CompletedProcess:
         """Run FFmpeg process with proper timeout handling and cleanup"""
         process = None
         try:
-            logger.info(f"Starting FFmpeg process with timeout: {self.ffmpeg_timeout or 'None'}")
+            logger.info(f"Starting FFmpeg process with timeout: {self.ffmpeg_timeout or 'infinite'}")
             
             process = subprocess.Popen(
                 command,
@@ -37,6 +38,7 @@ class FFmpegProcessor:
                 preexec_fn=os.setsid
             )
             
+            # Pass None for no timeout, or the timeout value if set
             stdout, stderr = process.communicate(timeout=self.ffmpeg_timeout)
             
             if process.returncode != 0:
