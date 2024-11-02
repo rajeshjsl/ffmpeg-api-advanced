@@ -1,0 +1,22 @@
+ffmpeg-api/
+├── app/
+│   ├── __init__.py
+│   ├── core/
+│   │   ├── __init__.py
+│   │   └── processor.py
+│   ├── routes/
+│   │   ├── __init__.py
+│   │   ├── api.py
+│   │   └── monitor.py
+│   └── utils/
+│       ├── __init__.py
+│       └── redis_utils.py
+├── tests/
+│   ├── __init__.py
+│   ├── conftest.py
+│   ├── test_processor.py
+│   └── test_api.py
+├── requirements.txt
+├── Dockerfile
+├── docker-compose.yml
+└── README.md
