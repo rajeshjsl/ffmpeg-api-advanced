@@ -7,7 +7,7 @@ import logging
 import json
 import mimetypes
 import requests
-from typing import List, Dict, Optional, Union
+from typing import List, Dict, Optional, Union, Any
 from celery import Task, shared_task
 
 # Import celery app instance from the app package
@@ -84,13 +84,11 @@ class FFmpegProcessor:
     def _get_ffmpeg_command(self, task_type: str, input_files: List[str], 
                            output_file: str, custom_params: Optional[str] = None) -> List[str]:
         """Build FFmpeg command based on task type"""
-        threads = '-threads:v' if task_type != 'normalize' else '-threads'
-        thread_count = 'auto' if self.ffmpeg_threads == 'auto' else self.ffmpeg_threads
-
         base_command = ['ffmpeg']
         
-        if thread_count != 'auto':
-            base_command.extend([threads, thread_count])
+        if self.ffmpeg_threads != 'auto':
+            # Changed from -threads:v to global -threads
+            base_command.extend(['-threads', self.ffmpeg_threads])
 
         for input_file in input_files:
             base_command.extend(['-i', input_file])
@@ -118,36 +116,40 @@ class FFmpegTask(Task):
 
     def _send_callback(self, task_id: str, result_path: str, callback_url: str, error: Optional[str] = None):
         """Send callback with result file or error"""
+        logger.info(f"Starting callback for task {task_id} to {callback_url}")
         try:
             if error:
-                response = requests.post(callback_url, json={
+                payload = {
                     'task_id': task_id,
                     'status': 'failed',
                     'error': error
-                })
+                }
+                logger.info(f"Sending error callback for task {task_id}: {payload}")
+                response = requests.post(callback_url, json=payload)
             else:
                 # Determine mime type
                 mime_type, _ = mimetypes.guess_type(result_path)
                 if not mime_type:
                     mime_type = 'video/mp4'
 
+                logger.info(f"Sending success callback for task {task_id} with file {result_path} (type: {mime_type})")
+                
                 # Send file in callback
                 with open(result_path, 'rb') as f:
                     files = {'file': (os.path.basename(result_path), f, mime_type)}
-                    response = requests.post(
-                        callback_url,
-                        files=files,
-                        data={
-                            'task_id': task_id,
-                            'status': 'completed'
-                        }
-                    )
+                    data = {
+                        'task_id': task_id,
+                        'status': 'completed'
+                    }
+                    response = requests.post(callback_url, files=files, data=data)
+            
+            logger.info(f"Callback response for task {task_id}: status={response.status_code}, content={response.text[:200]}")
             
             if not response.ok:
-                logger.error(f"Callback failed: {response.status_code} - {response.text}")
+                logger.error(f"Callback failed for task {task_id}: {response.status_code} - {response.text}")
                 
         except Exception as e:
-            logger.error(f"Error sending callback: {str(e)}")
+            logger.error(f"Error sending callback for task {task_id} to {callback_url}: {str(e)}", exc_info=True)
 
     def on_success(self, retval, task_id, args, kwargs):
         """Handle successful task completion"""

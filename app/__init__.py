@@ -1,7 +1,9 @@
-from flask import Flask
+from flask import Flask, request
 from celery import Celery
 from redis import Redis
 import os
+import logging
+from logging.config import dictConfig
 
 # Initialize Celery with the correct main module name
 celery = Celery('app')
@@ -24,9 +26,50 @@ celery.conf.update({
     }
 })
 
+# Add logging configuration before creating the app
+dictConfig({
+    'version': 1,
+    'formatters': {
+        'default': {
+            'format': '[%(asctime)s] %(levelname)s in %(module)s: %(message)s',
+        }
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'stream': 'ext://sys.stdout',
+            'formatter': 'default'
+        }
+    },
+    'root': {
+        'level': 'INFO',
+        'handlers': ['console']
+    },
+    'loggers': {
+        'app': {
+            'level': 'INFO',
+            'handlers': ['console'],
+            'propagate': False
+        },
+        'gunicorn.error': {
+            'level': 'INFO',
+            'handlers': ['console'],
+            'propagate': False
+        }
+    }
+})
+
 def create_app():
     """Application factory function"""
     app = Flask(__name__)
+
+    # Enable logging of all requests
+    @app.before_request
+    def log_request_info():
+        if request.method == 'POST':  # Only log POST requests
+            app.logger.info('Headers: %s', dict(request.headers))
+            app.logger.info('Files: %s', list(request.files.keys()) if request.files else None)
+            app.logger.info('Form Data Keys: %s', list(request.form.keys()) if request.form else None)
     
     # Initialize Redis
     app.redis = Redis.from_url(

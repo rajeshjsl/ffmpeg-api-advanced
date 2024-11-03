@@ -4,8 +4,11 @@ import os
 from pathlib import Path
 import uuid
 import mimetypes
+import logging
 from app.core.processor import process_ffmpeg
 from app.utils.redis_utils import RedisManager
+
+logger = logging.getLogger(__name__)
 
 bp = Blueprint('api', __name__)
 redis_manager = RedisManager()
@@ -21,6 +24,13 @@ def save_uploaded_file(file, prefix: str) -> Path:
 @bp.route('/captionize', methods=['POST'])
 def captionize_video():
     """Add subtitles to video"""
+
+    logger.info("Received captionize request")
+    
+    # Log request details
+    logger.info(f"Files received: {list(request.files.keys())}")
+    logger.info(f"Form data: {list(request.form.keys())}")
+    
     if 'input_video_file' not in request.files or 'input_ass_file' not in request.files:
         return jsonify({
             "error": "Both video and ASS subtitle files are required",
@@ -59,13 +69,17 @@ def captionize_video():
         custom_command,
         callback_url=callback_url
     )
+
+    logger.info(f"Started captionize task {task.id} for files: video={video_file.filename}, sub={subtitle_file.filename}")
     
     if callback_url:
-        return jsonify({
+        response = {
             'task_id': task.id,
             'status': 'processing',
             'status_url': f'/queue/task/{task.id}'
-        }), 202
+        }
+        logger.info(f"Returning async response for task {task.id}")
+        return jsonify(response), 202
         
     # Wait for result if no callback
     try:
