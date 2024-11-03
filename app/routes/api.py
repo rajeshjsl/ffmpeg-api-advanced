@@ -55,11 +55,16 @@ def captionize_video():
 
     callback_url = request.form.get('callback_url')
     custom_command = request.form.get('custom_command')
+    if custom_command and ('{video}' not in custom_command or '{subtitle}' not in custom_command):
+        return jsonify({
+            "error": "Invalid custom command",
+            "details": "Custom command must contain both '{video}' and '{subtitle}' placeholders. Example: -i {video} -vf subtitles={subtitle} -c:a copy"
+        }), 400
     
     # Save uploaded files with appropriate prefixes
     video_path = save_uploaded_file(video_file, 'video')
     subtitle_path = save_uploaded_file(subtitle_file, 'sub')
-    output_path = video_path.parent / f"output_{uuid.uuid4()}_{video_path.name}"
+    output_path = video_path.parent / f"captionized_{uuid.uuid4()}_{video_path.name}"
 
     # Start processing task with callback URL
     task = process_ffmpeg.delay(
@@ -98,11 +103,11 @@ def captionize_video():
             result,
             mimetype=mime_type,
             as_attachment=True,
-            download_name=f"captioned_{video_file.filename}"
+            download_name=f"captionized_{video_file.filename}"
         )
         
         response.headers['Content-Type'] = mime_type
-        response.headers['X-Filename'] = f"captioned_{video_file.filename}"
+        response.headers['X-Filename'] = f"captionized_{video_file.filename}"
         
         return response
         
@@ -125,6 +130,11 @@ def normalize_audio():
 
     callback_url = request.form.get('callback_url')
     custom_command = request.form.get('custom_command')
+    if custom_command and '{input}' not in custom_command:
+        return jsonify({
+            "error": "Invalid custom command",
+            "details": "Custom command must contain '{input}' placeholder. Example: -i {input} -filter:a volume=2.0"
+        }), 400
     
     # Save uploaded file
     input_path = save_uploaded_file(input_file, 'input')
