@@ -47,7 +47,7 @@ services:
       - KEEP_FILES=false
       - CLEANUP_INTERVAL=3600
       - FILE_RETENTION_PERIOD=86400
-      - CELERY_CONCURRENCY=2
+      - CELERY_CONCURRENCY=1
     depends_on:
       - redis
 
