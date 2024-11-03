@@ -44,6 +44,8 @@ class FFmpegProcessor:
             stdout, stderr = process.communicate(timeout=self.ffmpeg_timeout)
             
             if process.returncode != 0:
+                logger.error(f"FFmpeg error output:\n{stderr}")  # Log the error output
+                logger.error(f"FFmpeg stdout output:\n{stdout}")  # Also log stdout for context
                 raise subprocess.CalledProcessError(
                     process.returncode, 
                     command, 
@@ -189,8 +191,15 @@ def process_ffmpeg(self, task_type: str, input_files: List[str],
         logger.info(f"Executing FFmpeg command: {' '.join(command)}")
         
         result = processor._run_ffmpeg_process(command)
+        logger.info(f"FFmpeg process completed successfully")  # Add success log
+        logger.info(f"FFmpeg stdout:\n{result.stdout}")  # Log stdout
+        logger.info(f"FFmpeg stderr:\n{result.stderr}")  # Log stderr even on success
         return output_file
         
+    except subprocess.CalledProcessError as e:
+        logger.error(f"FFmpeg process failed with code {e.returncode}")
+        logger.error(f"Error output:\n{e.stderr}")
+        raise
     except Exception as e:
         logger.exception("FFmpeg processing failed")
         raise
