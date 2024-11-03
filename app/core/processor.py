@@ -82,27 +82,33 @@ class FFmpegProcessor:
             raise
 
     def _get_ffmpeg_command(self, task_type: str, input_files: List[str], 
-                           output_file: str, custom_params: Optional[str] = None) -> List[str]:
+                        output_file: str, custom_params: Optional[str] = None) -> List[str]:
         """Build FFmpeg command based on task type"""
         base_command = ['ffmpeg']
         
         if self.ffmpeg_threads != 'auto':
-            # Changed from -threads:v to global -threads
             base_command.extend(['-threads', self.ffmpeg_threads])
 
-        for input_file in input_files:
-            base_command.extend(['-i', input_file])
-
         if custom_params:
+            if task_type == 'normalize':
+                custom_params = custom_params.replace('{input}', input_files[0])
+            elif task_type == 'captionize':
+                custom_params = custom_params.replace('{video}', input_files[0])
+                custom_params = custom_params.replace('{subtitle}', input_files[1])
+            
+            # Add processed custom command
             base_command.extend(custom_params.split())
         else:
+            # Default commands
             if task_type == 'normalize':
                 base_command.extend([
+                    '-i', input_files[0],
                     '-filter:a', 'loudnorm',
                     '-c:v', 'copy'
                 ])
             elif task_type == 'captionize':
                 base_command.extend([
+                    '-i', input_files[0],
                     '-vf', f'subtitles={input_files[1]}',
                     '-c:a', 'copy'
                 ])
