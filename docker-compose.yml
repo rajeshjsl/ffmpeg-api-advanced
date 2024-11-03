@@ -17,9 +17,7 @@ services:
       - GUNICORN_TIMEOUT=600
       - FFMPEG_TIMEOUT=0
       - FFMPEG_THREADS=2
-      - KEEP_FILES=false
-      - CLEANUP_INTERVAL=3600
-      - FILE_RETENTION_PERIOD=86400
+      - KEEP_OUTPUT_FILES=false
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
     depends_on:
@@ -48,9 +46,7 @@ services:
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - FFMPEG_TIMEOUT=0
       - FFMPEG_THREADS=2
-      - KEEP_FILES=false
-      - CLEANUP_INTERVAL=3600
-      - FILE_RETENTION_PERIOD=86400
+      - KEEP_OUTPUT_FILES=false
       - CELERY_CONCURRENCY=1
     depends_on:
       - redis

@@ -10,24 +10,24 @@ import requests
 from typing import List, Dict, Optional, Union, Any
 from celery import Task, shared_task
 
-# Import celery app instance from the app package
+# Import celery app instance and FileManager
 from app import celery
 from app.utils.redis_utils import RedisManager
+from app.utils.file_manager import FileManager
 
 logger = logging.getLogger(__name__)
+
 class FFmpegProcessor:
     def __init__(self):
         self.temp_dir = Path(tempfile.gettempdir()) / "ffmpeg_api"
-        self.keep_files = os.getenv('KEEP_FILES', 'false').lower() == 'true'
         self.ffmpeg_threads = os.getenv('FFMPEG_THREADS', 'auto')
-        self.cleanup_interval = int(os.getenv('CLEANUP_INTERVAL', '3600'))
-        self.retention_period = int(os.getenv('FILE_RETENTION_PERIOD', '86400'))
         # If FFMPEG_TIMEOUT=0 or not set, it means no timeout (None)
         ffmpeg_timeout = int(os.getenv('FFMPEG_TIMEOUT', '0'))
         self.ffmpeg_timeout = None if ffmpeg_timeout == 0 else ffmpeg_timeout
+        self.file_manager = FileManager()
 
     def _run_ffmpeg_process(self, command: List[str]) -> subprocess.CompletedProcess:
-        """Run FFmpeg process with proper timeout handling and cleanup"""
+        """Run FFmpeg process with proper timeout handling"""
         process = None
         try:
             logger.info(f"Starting FFmpeg process with timeout: {self.ffmpeg_timeout or 'infinite'}")
@@ -40,12 +40,11 @@ class FFmpegProcessor:
                 preexec_fn=os.setsid
             )
             
-            # Pass None for no timeout, or the timeout value if set
             stdout, stderr = process.communicate(timeout=self.ffmpeg_timeout)
             
             if process.returncode != 0:
-                logger.error(f"FFmpeg error output:\n{stderr}")  # Log the error output
-                logger.error(f"FFmpeg stdout output:\n{stdout}")  # Also log stdout for context
+                logger.error(f"FFmpeg error output:\n{stderr}")
+                logger.error(f"FFmpeg stdout output:\n{stdout}")
                 raise subprocess.CalledProcessError(
                     process.returncode, 
                     command, 
@@ -98,10 +97,8 @@ class FFmpegProcessor:
                 custom_params = custom_params.replace('{video}', input_files[0])
                 custom_params = custom_params.replace('{subtitle}', input_files[1])
             
-            # Add processed custom command
             base_command.extend(custom_params.split())
         else:
-            # Default commands
             if task_type == 'normalize':
                 base_command.extend([
                     '-i', input_files[0],
@@ -125,6 +122,8 @@ class FFmpegTask(Task):
     def _send_callback(self, task_id: str, result_path: str, callback_url: str, error: Optional[str] = None):
         """Send callback with result file or error"""
         logger.info(f"Starting callback for task {task_id} to {callback_url}")
+        file_manager = FileManager()  # Create FileManager instance
+        
         try:
             if error:
                 payload = {
@@ -158,6 +157,12 @@ class FFmpegTask(Task):
                 
         except Exception as e:
             logger.error(f"Error sending callback for task {task_id} to {callback_url}: {str(e)}", exc_info=True)
+        finally:
+            # Always attempt to clean up after callback, based on KEEP_OUTPUT_FILES setting
+            try:
+                file_manager.cleanup_output_file(result_path)
+            except Exception as cleanup_error:
+                logger.error(f"Error during file cleanup after callback: {cleanup_error}")
 
     def on_success(self, retval, task_id, args, kwargs):
         """Handle successful task completion"""
@@ -191,15 +196,24 @@ def process_ffmpeg(self, task_type: str, input_files: List[str],
         logger.info(f"Executing FFmpeg command: {' '.join(command)}")
         
         result = processor._run_ffmpeg_process(command)
-        logger.info(f"FFmpeg process completed successfully")  # Add success log
-        logger.info(f"FFmpeg stdout:\n{result.stdout}")  # Log stdout
-        logger.info(f"FFmpeg stderr:\n{result.stderr}")  # Log stderr even on success
+        logger.info(f"FFmpeg process completed successfully")
+        logger.info(f"FFmpeg stdout:\n{result.stdout}")
+        logger.info(f"FFmpeg stderr:\n{result.stderr}")
+        
+        # Clean up input files immediately
+        processor.file_manager.cleanup_input_files(input_files)
+        
+        # Always return the output file path - cleanup will happen after sending response
         return output_file
         
     except subprocess.CalledProcessError as e:
         logger.error(f"FFmpeg process failed with code {e.returncode}")
         logger.error(f"Error output:\n{e.stderr}")
+        # Clean up all files on failure
+        processor.file_manager.cleanup_files(input_files, output_file)
         raise
     except Exception as e:
         logger.exception("FFmpeg processing failed")
+        # Clean up all files on failure
+        processor.file_manager.cleanup_files(input_files, output_file)
         raise

@@ -7,11 +7,41 @@ import mimetypes
 import logging
 from app.core.processor import process_ffmpeg
 from app.utils.redis_utils import RedisManager
+from app.utils.file_manager import FileManager
 
 logger = logging.getLogger(__name__)
 
 bp = Blueprint('api', __name__)
 redis_manager = RedisManager()
+file_manager = FileManager()
+
+def send_file_and_cleanup(file_path: str, mime_type: str, download_name: str):
+    """Helper function to send file and handle cleanup"""
+    try:
+        response = send_file(
+            file_path,
+            mimetype=mime_type,
+            as_attachment=True,
+            download_name=download_name
+        )
+        
+        response.headers['Content-Type'] = mime_type
+        response.headers['X-Filename'] = download_name
+        
+        # Call after_this_request to ensure cleanup happens after response is sent
+        def cleanup(response):
+            file_manager.cleanup_output_file(file_path)
+            return response
+            
+        if not file_manager.keep_output_files:
+            from flask import after_this_request
+            after_this_request(cleanup)
+            
+        return response
+    except Exception as e:
+        # Clean up on error
+        file_manager.cleanup_output_file(file_path)
+        raise
 
 def save_uploaded_file(file, prefix: str) -> Path:
     """Save uploaded file with secure name"""
