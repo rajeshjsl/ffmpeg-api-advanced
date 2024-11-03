@@ -34,6 +34,10 @@ services:
 
   worker:
     build: .
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
     entrypoint: ["/app/worker-entrypoint.sh"]  # Override entrypoint for worker
     networks:
       - ffmpeg_network
