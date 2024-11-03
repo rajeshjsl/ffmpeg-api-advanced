@@ -54,7 +54,6 @@ def save_uploaded_file(file, prefix: str) -> Path:
 @bp.route('/captionize', methods=['POST'])
 def captionize_video():
     """Add subtitles to video"""
-
     logger.info("Received captionize request")
     
     # Log request details
@@ -96,7 +95,7 @@ def captionize_video():
     subtitle_path = save_uploaded_file(subtitle_file, 'sub')
     output_path = video_path.parent / f"captionized_{uuid.uuid4()}_{video_path.name}"
 
-    # Start processing task with callback URL
+    # Start processing task
     task = process_ffmpeg.delay(
         'captionize',
         [str(video_path), str(subtitle_path)],
@@ -118,28 +117,18 @@ def captionize_video():
         
     # Wait for result if no callback
     try:
-        # For synchronous requests:
-        # - If FFMPEG_TIMEOUT=0, we wait indefinitely (timeout=None)
-        # - If FFMPEG_TIMEOUT>0, we use that value
         ffmpeg_timeout = int(os.getenv('FFMPEG_TIMEOUT', '0'))
         result = task.get(timeout=None if ffmpeg_timeout == 0 else ffmpeg_timeout)
         
-        # Determine mime type
         mime_type, _ = mimetypes.guess_type(output_path)
         if not mime_type:
             mime_type = 'video/mp4'
             
-        response = send_file(
+        return send_file_and_cleanup(
             result,
-            mimetype=mime_type,
-            as_attachment=True,
-            download_name=f"captionized_{video_file.filename}"
+            mime_type,
+            f"captionized_{video_file.filename}"
         )
-        
-        response.headers['Content-Type'] = mime_type
-        response.headers['X-Filename'] = f"captionized_{video_file.filename}"
-        
-        return response
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -170,7 +159,7 @@ def normalize_audio():
     input_path = save_uploaded_file(input_file, 'input')
     output_path = input_path.parent / f"normalized_{uuid.uuid4()}_{input_path.name}"
     
-    # Start processing task with callback URL
+    # Start processing task
     task = process_ffmpeg.delay(
         'normalize',
         [str(input_path)],
@@ -195,17 +184,11 @@ def normalize_audio():
         if not mime_type:
             mime_type = 'video/mp4' if output_path.suffix in ['.mp4', '.mov'] else 'audio/mpeg'
             
-        response = send_file(
+        return send_file_and_cleanup(
             result,
-            mimetype=mime_type,
-            as_attachment=True,
-            download_name=f"normalized_{input_file.filename}"
+            mime_type,
+            f"normalized_{input_file.filename}"
         )
-        
-        response.headers['Content-Type'] = mime_type
-        response.headers['X-Filename'] = f"normalized_{input_file.filename}"
-        
-        return response
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
