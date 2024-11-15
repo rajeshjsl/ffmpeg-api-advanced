@@ -9,6 +9,7 @@ import mimetypes
 import requests
 from typing import List, Dict, Optional, Union, Any
 from celery import Task, shared_task
+import shlex
 
 # Import celery app instance and FileManager
 from app import celery
@@ -97,7 +98,7 @@ class FFmpegProcessor:
                 custom_params = custom_params.replace('{video}', input_files[0])
                 custom_params = custom_params.replace('{subtitle}', input_files[1])
             
-            base_command.extend(custom_params.split())
+            base_command.extend(shlex.split(custom_params))
         else:
             if task_type == 'normalize':
                 base_command.extend([
@@ -193,6 +194,7 @@ def process_ffmpeg(self, task_type: str, input_files: List[str],
     
     try:
         command = processor._get_ffmpeg_command(task_type, input_files, output_file, custom_params)
+        logger.info("\033[32mcommand value is: %s\033[0m", command)
         logger.info(f"Executing FFmpeg command: {' '.join(command)}")
         
         result = processor._run_ffmpeg_process(command)
