@@ -5,8 +5,6 @@ services:
       resources:
         limits:
           cpus: '2'
-    ports:
-      - "8120:8000"
     networks:
       - ffmpeg_network
     volumes:
