@@ -1,0 +1,67 @@
+services:
+  ffmpeg-api:
+    build: .
+    deploy:
+      resources:
+        limits:
+          cpus: '20'
+    ports:
+      - "8120:8000"
+    networks:
+      - ffmpeg_network
+    volumes:
+      - ffmpeg_api:/tmp/ffmpeg_api
+    environment:
+      - GUNICORN_WORKERS=2
+      - GUNICORN_THREADS=2
+      - GUNICORN_TIMEOUT=600
+      - FFMPEG_TIMEOUT=0
+      - FFMPEG_THREADS=auto
+      - KEEP_OUTPUT_FILES=false
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      - redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+  worker:
+    build: .
+    deploy:
+      resources:
+        limits:
+          cpus: '20'
+    entrypoint: ["/app/worker-entrypoint.sh"]  # Override entrypoint for worker
+    networks:
+      - ffmpeg_network
+    volumes:
+      - ffmpeg_api:/tmp/ffmpeg_api
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - FFMPEG_TIMEOUT=0
+      - FFMPEG_THREADS=auto
+      - KEEP_OUTPUT_FILES=false
+      - CELERY_CONCURRENCY=4
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:alpine
+    networks:
+      - ffmpeg_network
+    volumes:
+      - redis_data:/data
+
+networks:
+  ffmpeg_network:
+    driver: bridge
+
+volumes:
+  ffmpeg_api:
+  redis_data:
