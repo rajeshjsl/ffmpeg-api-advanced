@@ -50,6 +50,8 @@ RUN echo "ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula sele
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
+RUN fc-cache -fv
+
 # Set working directory
 WORKDIR /app
 
