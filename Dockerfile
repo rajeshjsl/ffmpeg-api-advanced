@@ -1,10 +1,30 @@
-FROM python:3.11-slim
+FROM linuxserver/ffmpeg:version-7.1-cli
 
-# Install FFmpeg and curl (for healthcheck)
+# Install necessary dependencies and Python 3.11
 RUN apt-get update && \
-    apt-get install -y ffmpeg curl && \
-    apt-get clean && \
+    apt-get install -y \
+    software-properties-common \
+    curl \
+    lsb-release \
+    && add-apt-repository ppa:deadsnakes/ppa && \
+    apt-get update && \
+    apt-get install -y \
+    python3.11 \
+    python3.11-venv \
+    && apt-get clean && \
     rm -rf /var/lib/apt/lists/*
+
+# Install pip for Python 3.11 using get-pip.py
+RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
+    python3.11 get-pip.py && \
+    rm get-pip.py
+
+# Set Python 3.11 as the default Python version
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
+
+# Use the correct path to pip installed with python3.11
+RUN ln -s /usr/local/bin/pip /usr/bin/pip
+
 
 # Set working directory
 WORKDIR /app
