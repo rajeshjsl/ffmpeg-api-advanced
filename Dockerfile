@@ -1,5 +1,8 @@
 FROM linuxserver/ffmpeg:version-7.1-cli
 
+# Set non-interactive mode for apt-get
+ENV DEBIAN_FRONTEND=noninteractive
+
 # Install necessary dependencies and Python 3.11
 RUN apt-get update && \
     apt-get install -y \
@@ -11,6 +14,11 @@ RUN apt-get update && \
     apt-get install -y \
     python3.11 \
     python3.11-venv \
+    python3.11-dev \
+    python3-apt \
+    libapt-pkg-dev \
+    build-essential \
+    git \    
     && apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -22,16 +30,32 @@ RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
 # Set Python 3.11 as the default Python version
 RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
 
-# Use the correct path to pip installed with python3.11
-RUN ln -s /usr/local/bin/pip /usr/bin/pip
+# Create symlink for pip
+RUN ln -s /usr/local/bin/pip3.11 /usr/bin/pip3.11
 
+# Manually build and install python-apt to ensure compatibility
+RUN cd /tmp && \
+    git clone https://salsa.debian.org/apt-team/python-apt.git && \
+    cd python-apt && \
+    python3.11 setup.py build && \
+    python3.11 setup.py install && \
+    cd .. && \
+    rm -rf python-apt
+
+# Accept MS fonts license before installing
+RUN echo "ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true" | debconf-set-selections && \
+    apt-get update && \
+    apt-get install -y ttf-mscorefonts-installer fontconfig && \
+    fc-cache -fv && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # Set working directory
 WORKDIR /app
 
 # Install Python dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip3.11 install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY . .
