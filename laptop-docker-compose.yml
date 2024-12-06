@@ -7,8 +7,6 @@ services:
           cpus: '20'
     ports:
       - "8120:8000"
-    networks:
-      - ffmpeg_network
     volumes:
       - ffmpeg_api:/tmp/ffmpeg_api
     environment:
@@ -37,8 +35,6 @@ services:
         limits:
           cpus: '20'
     entrypoint: ["/app/worker-entrypoint.sh"]  # Override entrypoint for worker
-    networks:
-      - ffmpeg_network
     volumes:
       - ffmpeg_api:/tmp/ffmpeg_api
     environment:
@@ -53,14 +49,8 @@ services:
 
   ffmpeg-api-redis:
     image: redis:alpine
-    networks:
-      - ffmpeg_network
     volumes:
       - redis_data:/data
-
-networks:
-  ffmpeg_network:
-    driver: bridge
 
 volumes:
   ffmpeg_api:
