@@ -18,10 +18,10 @@ services:
       - FFMPEG_TIMEOUT=0
       - FFMPEG_THREADS=auto
       - KEEP_OUTPUT_FILES=false
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://ffmpeg-api-redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://ffmpeg-api-redis:6379/0
     depends_on:
-      - redis
+      - ffmpeg-api-redis
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -30,7 +30,7 @@ services:
       retries: 3
       start_period: 5s
 
-  worker:
+  ffmpeg-api-worker:
     build: .
     deploy:
       resources:
@@ -42,16 +42,16 @@ services:
     volumes:
       - ffmpeg_api:/tmp/ffmpeg_api
     environment:
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://ffmpeg-api-redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://ffmpeg-api-redis:6379/0
       - FFMPEG_TIMEOUT=0
       - FFMPEG_THREADS=auto
       - KEEP_OUTPUT_FILES=false
       - CELERY_CONCURRENCY=4
     depends_on:
-      - redis
+      - ffmpeg-api-redis
 
-  redis:
+  ffmpeg-api-redis:
     image: redis:alpine
     networks:
       - ffmpeg_network
