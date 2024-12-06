@@ -5,10 +5,6 @@ services:
       resources:
         limits:
           cpus: '2'
-    ports:
-      - "8120:8000"
-    networks:
-      - ffmpeg_network
     volumes:
       - ffmpeg_api:/tmp/ffmpeg_api
     environment:
@@ -18,10 +14,10 @@ services:
       - FFMPEG_TIMEOUT=0
       - FFMPEG_THREADS=2
       - KEEP_OUTPUT_FILES=false
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://ffmpeg-api-redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://ffmpeg-api-redis:6379/0
     depends_on:
-      - redis
+      - ffmpeg-api-redis
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -30,37 +26,29 @@ services:
       retries: 3
       start_period: 5s
 
-  worker:
+  ffmpeg-api-worker:
     build: .
     deploy:
       resources:
         limits:
           cpus: '2'
     entrypoint: ["/app/worker-entrypoint.sh"]  # Override entrypoint for worker
-    networks:
-      - ffmpeg_network
     volumes:
       - ffmpeg_api:/tmp/ffmpeg_api
     environment:
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://ffmpeg-api-redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://ffmpeg-api-redis:6379/0
       - FFMPEG_TIMEOUT=0
       - FFMPEG_THREADS=2
       - KEEP_OUTPUT_FILES=false
       - CELERY_CONCURRENCY=1
     depends_on:
-      - redis
+      - ffmpeg-api-redis
 
-  redis:
+  ffmpeg-api-redis:
     image: redis:alpine
-    networks:
-      - ffmpeg_network
     volumes:
       - redis_data:/data
-
-networks:
-  ffmpeg_network:
-    driver: bridge
 
 volumes:
   ffmpeg_api:
